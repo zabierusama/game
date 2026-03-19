@@ -3,141 +3,136 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Temple Run 3D風</title>
+<title>Tetris Mini</title>
 <style>
-  body{margin:0;background:#000;color:#fff;text-align:center;font-family:sans-serif}
-  canvas{display:block;margin:0 auto;background:#02030a}
+ body{margin:0;background:#000;color:#fff;text-align:center;font-family:sans-serif}
+ canvas{background:#111;display:block;margin:20px auto}
 </style>
 </head>
 <body>
-<h2>Temple Run 3D風</h2>
-<p>← → 移動 / ↑ ジャンプ / ↓ スライディング</p>
-<canvas id="game" width="300" height="500"></canvas>
+<h2>Tetris Mini</h2>
+<p>← → 移動 / ↑ 回転 / ↓ 早く落とす</p>
+<canvas id="game" width="200" height="400"></canvas>
 
 <script>
 const canvas=document.getElementById("game");
 const ctx=canvas.getContext("2d");
+const ROW=20,COL=10,SIZE=20;
+let board=Array.from({length:ROW},()=>Array(COL).fill(0));
 
-let player={lane:1,y:400,vy:0,sliding:false};
-let gravity=0.6;
-let speed=4;
-let obstacles=[];
-let coins=[];
+const shapes=[
+ [[1,1,1,1]],
+ [[1,1],[1,1]],
+ [[0,1,0],[1,1,1]],
+ [[1,0,0],[1,1,1]],
+ [[0,0,1],[1,1,1]],
+ [[1,1,0],[0,1,1]],
+ [[0,1,1],[1,1,0]]
+];
+
+let piece,px,py;
 let score=0;
-let frame=0;
 
-function spawn(){
-  const lane=Math.floor(Math.random()*3);
-  obstacles.push({lane,z:1,type:Math.random()<0.5?"jump":"slide"});
+function newPiece(){
+ piece=shapes[Math.floor(Math.random()*shapes.length)];
+ px=3;py=0;
+ if(collide(px,py,piece)){
+   alert("ゲームオーバー！スコア:"+score);
+   location.reload();
+ }
 }
 
-function spawnCoin(){
-  const lane=Math.floor(Math.random()*3);
-  coins.push({lane,z:1});
+function rotate(p){
+ return p[0].map((_,i)=>p.map(r=>r[i]).reverse());
 }
 
-function update(){
-  frame++;
-  if(frame%60===0) spawn();
-  if(frame%40===0) spawnCoin();
-
-  speed+=0.002;
-
-  player.vy+=gravity;
-  player.y+=player.vy;
-  if(player.y>400){player.y=400;player.vy=0;}
-
-  obstacles.forEach(o=>o.z-=0.02*speed/4);
-  coins.forEach(c=>c.z-=0.02*speed/4);
-
-  // 衝突
-  obstacles.forEach(o=>{
-    if(o.lane===player.lane && o.z<0.2){
-      if(o.type==="jump" && player.y>=400) gameOver();
-      if(o.type==="slide" && !player.sliding) gameOver();
+function collide(x,y,p){
+ for(let dy=0;dy<p.length;dy++){
+  for(let dx=0;dx<p[0].length;dx++){
+    if(p[dy][dx]){
+      let nx=x+dx,ny=y+dy;
+      if(nx<0||nx>=COL||ny>=ROW||board[ny][nx]) return true;
     }
-  });
-
-  // コイン
-  coins=coins.filter(c=>{
-    if(c.lane===player.lane && c.z<0.2){
-      score+=50;
-      return false;
-    }
-    return c.z>0;
-  });
-
-  obstacles=obstacles.filter(o=>o.z>0);
-  score++;
+  }
+ }
+ return false;
 }
 
-function gameOver(){
-  alert("ゲームオーバー！スコア:"+score);
-  location.reload();
+function merge(){
+ piece.forEach((r,dy)=>{
+  r.forEach((v,dx)=>{
+    if(v) board[py+dy][px+dx]=1;
+  });
+ });
 }
 
-function project(lane,z){
-  const scale=1/(z+0.2);
-  const x=(lane-1)*60*scale + 150;
-  const y=500 - z*500;
-  return {x,y,scale};
+function clearLines(){
+ for(let y=ROW-1;y>=0;y--){
+  if(board[y].every(v=>v)){
+    board.splice(y,1);
+    board.unshift(Array(COL).fill(0));
+    score+=100;
+    y++;
+  }
+ }
 }
 
 function draw(){
-  ctx.clearRect(0,0,300,500);
+ ctx.clearRect(0,0,200,400);
 
-  // 道（遠近法）
-  for(let i=0;i<20;i++){
-    let z=i/20;
-    let p=project(0,z);
-    let w=300*(1/(z+0.2));
-    ctx.fillStyle="#111";
-    ctx.fillRect(150-w/2,p.y,w,2);
+ // board
+ for(let y=0;y<ROW;y++){
+  for(let x=0;x<COL;x++){
+    if(board[y][x]){
+      ctx.fillStyle="#4fc3f7";
+      ctx.fillRect(x*SIZE,y*SIZE,SIZE-1,SIZE-1);
+    }
   }
+ }
 
-  // プレイヤー（固定手前）
-  ctx.fillStyle="#4fc3f7";
-  let h=player.sliding?15:30;
-  ctx.fillRect(player.lane*100+35,player.y+(30-h),30,h);
-
-  // 障害物
-  obstacles.forEach(o=>{
-    let p=project(o.lane,o.z);
-    let size=30*p.scale;
-    ctx.fillStyle=o.type==="jump"?"#f44336":"#ff9800";
-    ctx.fillRect(p.x-size/2,p.y-size/2,size,size);
+ // piece
+ piece.forEach((r,dy)=>{
+  r.forEach((v,dx)=>{
+    if(v){
+      ctx.fillStyle="#ff9800";
+      ctx.fillRect((px+dx)*SIZE,(py+dy)*SIZE,SIZE-1,SIZE-1);
+    }
   });
+ });
 
-  // コイン
-  ctx.fillStyle="gold";
-  coins.forEach(c=>{
-    let p=project(c.lane,c.z);
-    ctx.beginPath();
-    ctx.arc(p.x,p.y,10*p.scale,0,Math.PI*2);
-    ctx.fill();
-  });
-
-  ctx.fillStyle="#fff";
-  ctx.fillText("Score: "+score,10,20);
+ ctx.fillStyle="#fff";
+ ctx.fillText("Score:"+score,5,10);
 }
 
-function loop(){
-  update();
-  draw();
-  requestAnimationFrame(loop);
+let dropCounter=0;
+function update(){
+ dropCounter++;
+ if(dropCounter>30){
+  py++;
+  if(collide(px,py,piece)){
+    py--;
+    merge();
+    clearLines();
+    newPiece();
+  }
+  dropCounter=0;
+ }
+ draw();
+ requestAnimationFrame(update);
 }
 
 window.addEventListener("keydown",e=>{
-  if(e.key==="ArrowLeft"&&player.lane>0) player.lane--;
-  if(e.key==="ArrowRight"&&player.lane<2) player.lane++;
-  if(e.key==="ArrowUp"&&player.y>=400) player.vy=-12;
-  if(e.key==="ArrowDown"){
-    player.sliding=true;
-    setTimeout(()=>player.sliding=false,500);
-  }
+ if(e.key==="ArrowLeft"&&!collide(px-1,py,piece)) px--;
+ if(e.key==="ArrowRight"&&!collide(px+1,py,piece)) px++;
+ if(e.key==="ArrowDown") py++;
+ if(e.key==="ArrowUp"){
+   let r=rotate(piece);
+   if(!collide(px,py,r)) piece=r;
+ }
 });
 
-loop();
+newPiece();
+update();
 </script>
 </body>
 </html>
