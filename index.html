@@ -3,14 +3,14 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Temple Run Advanced</title>
+<title>Temple Run 3D風</title>
 <style>
   body{margin:0;background:#000;color:#fff;text-align:center;font-family:sans-serif}
-  canvas{display:block;margin:0 auto;background:#05070f}
+  canvas{display:block;margin:0 auto;background:#02030a}
 </style>
 </head>
 <body>
-<h2>Temple Run Advanced</h2>
+<h2>Temple Run 3D風</h2>
 <p>← → 移動 / ↑ ジャンプ / ↓ スライディング</p>
 <canvas id="game" width="300" height="500"></canvas>
 
@@ -28,12 +28,12 @@ let frame=0;
 
 function spawn(){
   const lane=Math.floor(Math.random()*3);
-  obstacles.push({lane,y:-20,type:Math.random()<0.5?"jump":"slide"});
+  obstacles.push({lane,z:1,type:Math.random()<0.5?"jump":"slide"});
 }
 
 function spawnCoin(){
   const lane=Math.floor(Math.random()*3);
-  coins.push({lane,y:-20});
+  coins.push({lane,z:1});
 }
 
 function update(){
@@ -47,12 +47,12 @@ function update(){
   player.y+=player.vy;
   if(player.y>400){player.y=400;player.vy=0;}
 
-  obstacles.forEach(o=>o.y+=speed);
-  coins.forEach(c=>c.y+=speed);
+  obstacles.forEach(o=>o.z-=0.02*speed/4);
+  coins.forEach(c=>c.z-=0.02*speed/4);
 
   // 衝突
   obstacles.forEach(o=>{
-    if(o.lane===player.lane && Math.abs(o.y-player.y)<30){
+    if(o.lane===player.lane && o.z<0.2){
       if(o.type==="jump" && player.y>=400) gameOver();
       if(o.type==="slide" && !player.sliding) gameOver();
     }
@@ -60,14 +60,14 @@ function update(){
 
   // コイン
   coins=coins.filter(c=>{
-    if(c.lane===player.lane && Math.abs(c.y-player.y)<30){
+    if(c.lane===player.lane && c.z<0.2){
       score+=50;
       return false;
     }
-    return c.y<500;
+    return c.z>0;
   });
 
-  obstacles=obstacles.filter(o=>o.y<500);
+  obstacles=obstacles.filter(o=>o.z>0);
   score++;
 }
 
@@ -76,33 +76,44 @@ function gameOver(){
   location.reload();
 }
 
+function project(lane,z){
+  const scale=1/(z+0.2);
+  const x=(lane-1)*60*scale + 150;
+  const y=500 - z*500;
+  return {x,y,scale};
+}
+
 function draw(){
   ctx.clearRect(0,0,300,500);
 
-  // 3D風レーン
+  // 道（遠近法）
   for(let i=0;i<20;i++){
-    let w=300-(i*10);
-    let x=(300-w)/2;
+    let z=i/20;
+    let p=project(0,z);
+    let w=300*(1/(z+0.2));
     ctx.fillStyle="#111";
-    ctx.fillRect(x,i*25,w,2);
+    ctx.fillRect(150-w/2,p.y,w,2);
   }
 
-  // プレイヤー
+  // プレイヤー（固定手前）
   ctx.fillStyle="#4fc3f7";
   let h=player.sliding?15:30;
   ctx.fillRect(player.lane*100+35,player.y+(30-h),30,h);
 
   // 障害物
   obstacles.forEach(o=>{
+    let p=project(o.lane,o.z);
+    let size=30*p.scale;
     ctx.fillStyle=o.type==="jump"?"#f44336":"#ff9800";
-    ctx.fillRect(o.lane*100+35,o.y,30,30);
+    ctx.fillRect(p.x-size/2,p.y-size/2,size,size);
   });
 
   // コイン
   ctx.fillStyle="gold";
   coins.forEach(c=>{
+    let p=project(c.lane,c.z);
     ctx.beginPath();
-    ctx.arc(c.lane*100+50,c.y+15,10,0,Math.PI*2);
+    ctx.arc(p.x,p.y,10*p.scale,0,Math.PI*2);
     ctx.fill();
   });
 
