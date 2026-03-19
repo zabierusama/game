@@ -3,136 +3,101 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Tetris Mini</title>
+<title>Othello 2P</title>
 <style>
- body{margin:0;background:#000;color:#fff;text-align:center;font-family:sans-serif}
- canvas{background:#111;display:block;margin:20px auto}
+ body{margin:0;background:#0b1a0b;color:#fff;text-align:center;font-family:sans-serif}
+ canvas{background:#2e7d32;display:block;margin:20px auto;border:4px solid #1b5e20}
 </style>
 </head>
 <body>
-<h2>Tetris Mini</h2>
-<p>← → 移動 / ↑ 回転 / ↓ 早く落とす</p>
-<canvas id="game" width="200" height="400"></canvas>
+<h2>オセロ（2人対戦）</h2>
+<p>クリックで石を置く</p>
+<canvas id="game" width="400" height="400"></canvas>
+<div id="info"></div>
 
 <script>
 const canvas=document.getElementById("game");
 const ctx=canvas.getContext("2d");
-const ROW=20,COL=10,SIZE=20;
-let board=Array.from({length:ROW},()=>Array(COL).fill(0));
+const SIZE=8;
+const CELL=50;
+let board=Array.from({length:SIZE},()=>Array(SIZE).fill(0));
 
-const shapes=[
- [[1,1,1,1]],
- [[1,1],[1,1]],
- [[0,1,0],[1,1,1]],
- [[1,0,0],[1,1,1]],
- [[0,0,1],[1,1,1]],
- [[1,1,0],[0,1,1]],
- [[0,1,1],[1,1,0]]
-];
+// 初期配置
+board[3][3]=2; board[4][4]=2;
+board[3][4]=1; board[4][3]=1;
 
-let piece,px,py;
-let score=0;
-
-function newPiece(){
- piece=shapes[Math.floor(Math.random()*shapes.length)];
- px=3;py=0;
- if(collide(px,py,piece)){
-   alert("ゲームオーバー！スコア:"+score);
-   location.reload();
- }
-}
-
-function rotate(p){
- return p[0].map((_,i)=>p.map(r=>r[i]).reverse());
-}
-
-function collide(x,y,p){
- for(let dy=0;dy<p.length;dy++){
-  for(let dx=0;dx<p[0].length;dx++){
-    if(p[dy][dx]){
-      let nx=x+dx,ny=y+dy;
-      if(nx<0||nx>=COL||ny>=ROW||board[ny][nx]) return true;
-    }
-  }
- }
- return false;
-}
-
-function merge(){
- piece.forEach((r,dy)=>{
-  r.forEach((v,dx)=>{
-    if(v) board[py+dy][px+dx]=1;
-  });
- });
-}
-
-function clearLines(){
- for(let y=ROW-1;y>=0;y--){
-  if(board[y].every(v=>v)){
-    board.splice(y,1);
-    board.unshift(Array(COL).fill(0));
-    score+=100;
-    y++;
-  }
- }
-}
+let turn=1; //1黒 2白
 
 function draw(){
- ctx.clearRect(0,0,200,400);
+ ctx.clearRect(0,0,400,400);
 
- // board
- for(let y=0;y<ROW;y++){
-  for(let x=0;x<COL;x++){
+ // グリッド
+ for(let y=0;y<SIZE;y++){
+  for(let x=0;x<SIZE;x++){
+    ctx.strokeStyle="#000";
+    ctx.strokeRect(x*CELL,y*CELL,CELL,CELL);
+
     if(board[y][x]){
-      ctx.fillStyle="#4fc3f7";
-      ctx.fillRect(x*SIZE,y*SIZE,SIZE-1,SIZE-1);
+      ctx.beginPath();
+      ctx.arc(x*CELL+25,y*CELL+25,20,0,Math.PI*2);
+      ctx.fillStyle=board[y][x]===1?"black":"white";
+      ctx.fill();
     }
   }
  }
 
- // piece
- piece.forEach((r,dy)=>{
-  r.forEach((v,dx)=>{
-    if(v){
-      ctx.fillStyle="#ff9800";
-      ctx.fillRect((px+dx)*SIZE,(py+dy)*SIZE,SIZE-1,SIZE-1);
-    }
-  });
+ document.getElementById("info").textContent = turn===1?"黒の番":"白の番";
+}
+
+function inside(x,y){return x>=0&&x<8&&y>=0&&y<8;}
+
+function flip(x,y){
+ let flipped=false;
+ const dirs=[[-1,-1],[0,-1],[1,-1],[-1,0],[1,0],[-1,1],[0,1],[1,1]];
+ dirs.forEach(([dx,dy])=>{
+   let nx=x+dx, ny=y+dy;
+   let cells=[];
+   while(inside(nx,ny) && board[ny][nx] && board[ny][nx]!==turn){
+     cells.push([nx,ny]);
+     nx+=dx; ny+=dy;
+   }
+   if(inside(nx,ny) && board[ny][nx]===turn && cells.length>0){
+     cells.forEach(([cx,cy])=> board[cy][cx]=turn);
+     flipped=true;
+   }
  });
-
- ctx.fillStyle="#fff";
- ctx.fillText("Score:"+score,5,10);
+ return flipped;
 }
 
-let dropCounter=0;
-function update(){
- dropCounter++;
- if(dropCounter>30){
-  py++;
-  if(collide(px,py,piece)){
-    py--;
-    merge();
-    clearLines();
-    newPiece();
-  }
-  dropCounter=0;
- }
- draw();
- requestAnimationFrame(update);
-}
+canvas.addEventListener("click",e=>{
+ const rect=canvas.getBoundingClientRect();
+ const x=Math.floor((e.clientX-rect.left)/CELL);
+ const y=Math.floor((e.clientY-rect.top)/CELL);
 
-window.addEventListener("keydown",e=>{
- if(e.key==="ArrowLeft"&&!collide(px-1,py,piece)) px--;
- if(e.key==="ArrowRight"&&!collide(px+1,py,piece)) px++;
- if(e.key==="ArrowDown") py++;
- if(e.key==="ArrowUp"){
-   let r=rotate(piece);
-   if(!collide(px,py,r)) piece=r;
+ if(board[y][x]) return;
+
+ if(flip(x,y)){
+   board[y][x]=turn;
+   turn = turn===1?2:1;
+   draw();
  }
 });
 
-newPiece();
-update();
+function count(){
+ let b=0,w=0;
+ board.forEach(r=>r.forEach(c=>{if(c===1)b++; if(c===2)w++;}));
+ return {b,w};
+}
+
+setInterval(()=>{
+ const {b,w}=count();
+ if(b+w===64){
+   alert(`終了！ 黒:${b} 白:${w}`);
+   location.reload();
+ }
+},1000);
+
+draw();
 </script>
 </body>
 </html>
